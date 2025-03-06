@@ -222,7 +222,7 @@ namespace WorkTimeCalculator
 
         private static void PrintTimeComputingMenu(int index)
         {
-            Console.Write($"Tape 0 to stop\n{index}) Time format [HH:MM->HH:MM] : ");
+            Console.Write($"Tape 0 to stop\n{index}) Time format [HH:MM->HH:MM] or [03h18m] : ");
         }
 
         private static int OnlyHourTryGet(string inputText)
