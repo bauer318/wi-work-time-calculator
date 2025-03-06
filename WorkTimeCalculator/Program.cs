@@ -1,4 +1,6 @@
-﻿using System.Text.RegularExpressions;
+﻿using System.Globalization;
+using System.Text.RegularExpressions;
+using System.Xml.XPath;
 
 namespace WorkTimeCalculator
 {
@@ -10,7 +12,7 @@ namespace WorkTimeCalculator
             try
             {
                 bool keepRunning = true;
-               
+
                 while (keepRunning)
                 {
                     string? chooseen = Console.ReadLine();
@@ -60,61 +62,75 @@ namespace WorkTimeCalculator
                 string? inputTime = Console.ReadLine();
                 if (!string.IsNullOrEmpty(inputTime))
                 {
-                    string inputTimeWithoutWhiteSpace = Regex.Replace(inputTime, @"\s+", "");
-                    bool isCorrectInputTimeFormat = Regex.IsMatch(inputTimeWithoutWhiteSpace, "[0-9]{2}:[0-9]{2}->[0-9]{2}:[0-9]{2}");
+                    var inputTimeWithoutWhiteSpace = Regex.Replace(inputTime, @"\s+", "");
+                    var isCorrectInputTimeFormat = Regex.IsMatch(inputTimeWithoutWhiteSpace,
+                    "([0-9]{2}:[0-9]{2}->[0-9]{2}:[0-9]{2})|(^[0-9]{2,}h[0-9]{2,}m$)|(^[0-9]{2,}h$)|(^[0-9]{2,}m$)");
+
+                    const NumberStyles styles = NumberStyles.None;
                     if (isCorrectInputTimeFormat)
                     {
-                        string[] inputTimeSplit = inputTimeWithoutWhiteSpace.Split("->");
-                        string[] startTime = inputTimeSplit[0].Split(":");
-                        string[] endTime = inputTimeSplit[1].Split(":");
-                        int startHour = Int32.Parse(startTime[0]);  
-                        int startMinute = Int32.Parse(startTime[1]);
-                     
-                        int endHour = Int32.Parse(endTime[0]);
-                        int endMinute = Int32.Parse(endTime[1]);
-                        if (!IsCorrectHour(startHour) || 
-                            !IsCorrectMinute(startMinute) ||
-                            !IsCorrectHour(endHour) ||
-                            !IsCorrectMinute(endMinute))
+                        if (IsNotTimeIntervale(inputTimeWithoutWhiteSpace))
                         {
-                            Console.WriteLine("Wrong value of hour or minute. Note 00 <= HH <= 23 and 00 <= MM <= 59");
-                            continue;
+                            int hours = OnlyHourTryGet(inputTimeWithoutWhiteSpace);
+                            int minutes = OnlyMinuteTryGet(inputTimeWithoutWhiteSpace);
+                            totalHours += hours;
+                            totalMinutes += minutes;
                         }
-                        if(startHour==endHour && endMinute < startMinute)
+                        else
                         {
-                            Console.WriteLine("Wrong end minutes");
-                            continue;
+                            string[] inputTimeSplit = inputTimeWithoutWhiteSpace.Split("->");
+                            string[] startTime = inputTimeSplit[0].Split(":");
+                            string[] endTime = inputTimeSplit[1].Split(":");
+                            int startHour = Int32.Parse(startTime[0]);
+                            int startMinute = Int32.Parse(startTime[1]);
+
+                            int endHour = Int32.Parse(endTime[0]);
+                            int endMinute = Int32.Parse(endTime[1]);
+                            if (!IsCorrectHour(startHour) ||
+                                !IsCorrectMinute(startMinute) ||
+                                !IsCorrectHour(endHour) ||
+                                !IsCorrectMinute(endMinute))
+                            {
+                                Console.WriteLine("Wrong value of hour or minute. Note 00 <= HH <= 23 and 00 <= MM <= 59");
+                                continue;
+                            }
+                            if (startHour == endHour && endMinute < startMinute)
+                            {
+                                Console.WriteLine("Wrong end minutes");
+                                continue;
+                            }
+                            DateTime startDateTime = new(currentYear, currentMonth, currentDay, startHour, startMinute, 00);
+                            //TODO Create method to encapsulate this logic
+                            if (endHour < startHour)
+                            {
+                                int incrementedIndex = TryToFindNextDate(currentDay, currentMonth, currentYear);
+                                if (incrementedIndex == 0)
+                                {
+                                    currentYear++;
+                                    currentDay = 1;
+                                    currentMonth = 1;
+
+                                }
+                                else if (incrementedIndex == 1)
+                                {
+                                    currentDay = 1;
+                                    currentMonth++;
+
+                                }
+                                else
+                                {
+                                    currentDay++;
+
+                                }
+                            }
+
+                            DateTime endDateTime = new(currentYear, currentMonth, currentDay, endHour, endMinute, 00);
+
+                            TimeSpan durration = endDateTime.Subtract(startDateTime);
+                            totalHours += durration.Hours;
+                            totalMinutes += durration.Minutes;
                         }
-                        DateTime startDateTime = new(currentYear, currentMonth, currentDay, startHour, startMinute, 00);
-                        //TODO Create method to encapsulate this logic
-                        if (endHour < startHour)
-                        {
-                            int incrementedIndex = TryToFindNextDate(currentDay, currentMonth, currentYear);
-                            if (incrementedIndex == 0)
-                            {
-                                currentYear++;
-                                currentDay = 1;
-                                currentMonth = 1;
 
-                            }
-                            else if (incrementedIndex == 1)
-                            {
-                                currentDay = 1;
-                                currentMonth++;
-
-                            }
-                            else
-                            {
-                                currentDay++;
-
-                            }
-                        }
-
-                        DateTime endDateTime = new(currentYear, currentMonth, currentDay, endHour, endMinute, 00);
-
-                        TimeSpan durration = endDateTime.Subtract(startDateTime);
-                        totalHours += durration.Hours;
-                        totalMinutes += durration.Minutes;
 
                         if (totalMinutes > 60)
                         {
@@ -128,7 +144,7 @@ namespace WorkTimeCalculator
                     }
                     else
                     {
-                        if (Int32.TryParse(inputTime, null, out var result) && result == 0)
+                        if (Int32.TryParse(inputTime, styles, null, out var result) && result == 0)
                         {
                             PrintMainMenu();
                             break;
@@ -147,7 +163,7 @@ namespace WorkTimeCalculator
 
             return (currentHours + newHours, newMinutes);
         }
-        private static int SetToDefaultValueIfIncorrect(int value, bool isMinute=false)
+        private static int SetToDefaultValueIfIncorrect(int value, bool isMinute = false)
         {
             if (isMinute)
             {
@@ -208,5 +224,30 @@ namespace WorkTimeCalculator
         {
             Console.Write($"Tape 0 to stop\n{index}) Time format [HH:MM->HH:MM] : ");
         }
+
+        private static int OnlyHourTryGet(string inputText)
+        {
+            if (inputText.Contains('h'))
+            {
+                string hourStr = inputText[..inputText.IndexOf('h')];
+                return int.Parse(hourStr);
+            }
+            return 0;
+        }
+        private static int OnlyMinuteTryGet(string inputText)
+        {
+            if (inputText.Contains('m'))
+            {
+                var startIndex = 0;
+                if (inputText.Contains('h'))
+                {
+                    startIndex = inputText.IndexOf('h') + 1;
+                }
+                string hourStr = inputText[startIndex..inputText.IndexOf('m')];
+                return int.Parse(hourStr);
+            }
+            return 0;
+        }
+        private static bool IsNotTimeIntervale(string inputText) => inputText.Contains('h') || inputText.EndsWith('m');
     }
 }
